@@ -1,8 +1,18 @@
-from colr import color
 from src.constants import tierDict
 import re
 
+
 class Colors:
+    ENEMY_RED = 13
+    TEAM_BLUE = 10
+    ME_YELLOW = 227
+    CYAN = 38
+    LIGHT_YELLOW = 228
+    BLUE = 27
+    ORANGE = 209
+    GRAY = 250
+    DEFAULT = 232
+
     def __init__(self, hide_names, agent_dict, AGENTCOLORLIST):
         self.hide_names = hide_names
         self.agent_dict = agent_dict
@@ -19,20 +29,19 @@ class Colors:
                     name = "Player"
         if team == 'Red':
             if playerPuuid not in party_members:
-                Teamcolor = color(name, fore=(238, 77, 77))
+                Teamcolor = Colors.ENEMY_RED
             else:
-                Teamcolor = color(orig_name, fore=(238, 77, 77))
+                Teamcolor = Colors.ENEMY_RED
         elif team == 'Blue':
             if playerPuuid not in party_members:
-                Teamcolor = color(name, fore=(76, 151, 237))
+                Teamcolor = Colors.TEAM_BLUE
             else:
-                Teamcolor = color(orig_name, fore=(76, 151, 237))
+                Teamcolor = Colors.TEAM_BLUE
         else:
             Teamcolor = ''
         if playerPuuid == selfPuuid:
-            Teamcolor = color(orig_name, fore=(221, 224, 41))
+            Teamcolor = Colors.ME_YELLOW
         return Teamcolor
-
 
     def get_rgb_color_from_skin(self, skin_id, valoApiSkins):
         for skin in valoApiSkins.json()["data"]:
@@ -40,88 +49,59 @@ class Colors:
                 return self.tier_dict[skin["contentTierUuid"]]
 
     def level_to_color(self, level):
-        if level >= 400:
-            return color(level, fore=(102, 212, 212))
-        elif level >= 300:
-            return color(level, fore=(207, 207, 76))
-        elif level >= 200:
-            return color(level, fore=(71, 71, 204))
-        elif level >= 100:
-            return color(level, fore=(241, 144, 54))
-        elif level < 100:
-            return color(level, fore=(211, 211, 211))
+        if 0 <= level < 100:
+            return Colors.GRAY
+        elif 100 <= level < 200:
+            return Colors.ORANGE
+        elif 200 <= level < 300:
+            return Colors.BLUE
+        elif 300 <= level < 400:
+            return Colors.LIGHT_YELLOW
+        elif 400 <= level:
+            return Colors.CYAN
 
     def get_agent_from_uuid(self, agentUUID):
         agent = str(self.agent_dict.get(agentUUID))
-        if self.AGENTCOLORLIST.get(agent.lower()) != None:
-            agent_color = self.AGENTCOLORLIST.get(agent.lower())
-            return color(agent, fore=agent_color)
-        else:
-            return agent
+        color = self.AGENTCOLORLIST.get(agent.lower())
+
+        if color is None:
+            color = Colors.DEFAULT
+
+        return [agent, color]
 
     def get_hs_gradient(self, number):
         try:
             number = int(number)
         except ValueError:
-            return color("N/a",fore=(46, 46, 46))
-        dark_red = (64, 15, 10)
-        yellow = (140, 119, 11)
-        green = (18, 204, 25)
-        white = (255, 255, 255)
-        gradients = {
-            (0, 25): (dark_red, yellow),
-            (25, 50): (yellow, green),
-            (50, 100): (green, white)
-        }
-        f = []
-        for gradient in gradients:
-            if gradient[0] <= number <= gradient[1]:
-                for rgb in range(3):
-                    if gradients[gradient][0][rgb] > gradients[gradient][1][rgb]:
-                        firstHigher = True
-                    else:
-                        firstHigher = False
-                    if firstHigher:
-                        offset = gradients[gradient][0][rgb] - gradients[gradient][1][rgb]
-                    else:
-                        offset = gradients[gradient][1][rgb] - gradients[gradient][0][rgb]
-                    if firstHigher:
-                        f.append(int(gradients[gradient][0][rgb] - offset * number / gradient[1]))
-                    else:
-                        f.append(int(offset * number / gradient[1] + gradients[gradient][0][rgb]))
-                return color(number, fore=f)
+            return ["N/A", 238]
+
+        if 0 < number <= 5:
+            return [number, 89]
+        elif 5 < number <= 10:
+            return [number, 173]
+        elif 10 < number <= 15:
+            return [number, 149]
+        elif 15 < number <= 29:
+            return [number, 77]
+        elif 29 < number:
+            return [number, 227]
 
     def get_wr_gradient(self, number):
         try:
             number = int(number)
         except ValueError:
-            return color("N/a",fore=(46, 46, 46))
-        dark_red = (64, 15, 10)
-        yellow = (140, 119, 11)
-        green = (18, 204, 25)
-        white = (255, 255, 255)
-        gradients = {
-            (0, 45): (dark_red, yellow),
-            (45, 55): (yellow, green),
-            (55, 100): (green, white)
-        }
-        f = []
-        for gradient in gradients:
-            if gradient[0] <= number <= gradient[1]:
-                for rgb in range(3):
-                    if gradients[gradient][0][rgb] > gradients[gradient][1][rgb]:
-                        firstHigher = True
-                    else:
-                        firstHigher = False
-                    if firstHigher:
-                        offset = gradients[gradient][0][rgb] - gradients[gradient][1][rgb]
-                    else:
-                        offset = gradients[gradient][1][rgb] - gradients[gradient][0][rgb]
-                    if firstHigher:
-                        f.append(int(gradients[gradient][0][rgb] - offset * number / gradient[1]))
-                    else:
-                        f.append(int(offset * number / gradient[1] + gradients[gradient][0][rgb]))
-                return color(number, fore=f)
+            return ["N/A", 238]
+
+        if 0 < number <= 15:
+            return [number, 89]
+        elif 15 < number <= 25:
+            return [number, 173]
+        elif 25 < number <= 40:
+            return [number, 149]
+        elif 40 < number <= 60:
+            return [number, 77]
+        elif 60 < number:
+            return [number, 227]
 
     def escape_ansi(self, line):
         ansi_escape = re.compile(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]')

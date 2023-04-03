@@ -1,9 +1,5 @@
 import json
 from websocket_server import WebsocketServer
-# from threading import Thread
-
-# websocket.enableTrace(True)
-
 
 
 class Server:
@@ -28,10 +24,6 @@ class Server:
         if self.lastMessage != "":
             self.send_message(self.lastMessage)
 
-
     def send_message(self, message):
         self.lastMessage = message
         self.server.send_message_to_all(message)
-
-        
-    
