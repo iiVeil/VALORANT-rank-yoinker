@@ -7,6 +7,7 @@ import os
 import requests
 import urllib3
 import threading
+from src.scoreboard import Scoreboard
 from TermUI.button import Button
 from TermUI.ui import UI
 from TermUI.region import Region
@@ -47,6 +48,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def main(stdscr):
+    stdscr.clear()
+    stdscr.refresh()
     os.system(f"title vRY v{version}")
     INACTIVE_RED = 161
     WARNING_YELLOW = 179
@@ -78,21 +81,16 @@ def main(stdscr):
     subtitle.color = WARNING_YELLOW
     loading_region.add_element(subtitle)
 
+    loading_status = Text("Loading vRY...", Position(
+        loading_region.size.half().x - len(subtitle_string) + 19,
+        loading_region.size.half().y+1))
+    loading_status.color = SUCCESS_GREEN
+
+    loading_region.add_element(loading_status)
+
     loaded = False
 
-    def activate_loading():
-        loading_ui.activate()
-
-    def deactivate_loading():
-        while True:
-            if loaded:
-                loading_ui.deactivate()
-                break
-
-    threading.Thread(target=activate_loading, name="loading",
-                     args=(), daemon=True).start()
-    threading.Thread(target=deactivate_loading, name="deloading",
-                     args=(), daemon=True).start()
+    loading_ui.draw()
 
     main_ui = UI(stdscr)
 
@@ -130,6 +128,10 @@ def main(stdscr):
         "Skins": skins_tab,
         "Chat": chat_tab
     }
+
+    loading_status.set_text("Creating UI...")
+    loading_ui.draw()
+
     tabs = []
     for name in pretabs:
         created = Button(name, tab_offset, pretabs[name])
@@ -156,15 +158,26 @@ def main(stdscr):
 
     content_regions['scoreboard'].visible = True
 
-    content_regions.get("scoreboard").add_element(
-        Text("Scoreboard", Position(0, 0)))
+    # content_regions.get("scoreboard").add_element(
+    #    Text("Scoreboard", Position(0, 0)))
     content_regions.get("skins").add_element(
         Text("Skins", Position(0, 0)))
     content_regions.get("chat").add_element(
         Text("Chat", Position(0, 0)))
 
-    team_1 = random.shuffle(["Skye", "Sova", "Omen", "Raze", "Reyna"])
-    team_2 = random.shuffle(["Skye", "Sova", "Omen", "Raze", "Reyna"])
+    waiting = True
+
+    def redraw_load():
+        while waiting:
+            loading_status.set_text("Waiting for valorant...")
+            loading_ui.draw()
+            time.sleep(3)
+        curses.curs_set(0)
+        curses.mousemask(1)
+
+    waiting_thread = threading.Thread(target=redraw_load, args=(), daemon=True)
+
+    waiting_thread.start()
 
     logger = Logging
     log = logger.log
@@ -203,9 +216,13 @@ def main(stdscr):
     seasonID = content.get_latest_season_id(gameContent)
     lastGameState = ""
 
+    waiting = False
+
     # print(color("\nVisit https://vry.netlify.app/matchLoadouts to view full player inventories\n", fore=(255, 253, 205)))
     # chatlog(color("\nVisit https://vry.netlify.app/matchLoadouts to view full player inventories\n", fore=(255, 253, 205)))
 
+    loading_status.set_text("Creating discord RPC")
+    loading_ui.draw()
     run = True
     while run:
         while True:
@@ -243,14 +260,6 @@ def main(stdscr):
             if kill_threads:
                 break
 
-    def redraw():
-        "Threaded method to redraw screen once every 5 seconds."
-        while True:
-            main_ui.draw()
-            time.sleep(5)
-            if kill_threads:
-                break
-
     def game_state_loop():
         nonlocal rpc
         nonlocal game_state
@@ -264,6 +273,200 @@ def main(stdscr):
 
         is_leaderboard_needed = False
         while True:
+            if game_state == "INGAME":
+                coregame_stats = coregame.get_coregame_stats()
+                if coregame_stats == None:
+                    continue
+                Players = coregame_stats["Players"]
+                # data for chat to function
+                presence = presences.get_presence()
+                partyMembers = menu.get_party_members(req.puuid, presence)
+                partyMembersList = [a["Subject"] for a in partyMembers]
+
+                players_data = {}
+                players_data.update({"ignore": partyMembersList})
+                for player in Players:
+                    if player["Subject"] == req.puuid:
+                        if cfg.get_feature_flag("discord_rpc"):
+                            rpc.set_data({"agent": player["CharacterID"]})
+                    players_data.update({player["Subject"]: {
+                                        "team": player["TeamID"], "agent": player["CharacterID"], "streamer_mode": player["PlayerIdentity"]["Incognito"]}})
+                Wss.set_player_data(players_data)
+
+                try:
+                    server = GAMEPODS[coregame_stats["GamePodID"]]
+                except KeyError:
+                    server = "New server"
+                presences.wait_for_presence(
+                    namesClass.get_players_puuid(Players))
+                names = namesClass.get_names_from_puuids(Players)
+                loadouts = loadoutsClass.get_match_loadouts(coregame.get_coregame_match_id(
+                ), Players, cfg.weapon, valoApiSkins, names, state="game")
+                # with alive_bar(total=len(Players), title='Fetching Players', bar='classic2') as bar:
+                isRange = False
+                playersLoaded = 1
+                partyOBJ = menu.get_party_json(
+                    namesClass.get_players_puuid(Players), presence)
+                # log(f"retrieved names dict: {names}")
+                Players.sort(key=lambda Players: Players["PlayerIdentity"].get(
+                    "AccountLevel"), reverse=True)
+                Players.sort(
+                    key=lambda Players: Players["TeamID"], reverse=True)
+                partyCount = 0
+                partyIcons = {}
+                lastTeamBoolean = False
+                lastTeam = "Red"
+
+                already_played_with = []
+                stats_data = stats.read_data()
+
+                for p in Players:
+                    if p["Subject"] == req.puuid:
+                        allyTeam = p["TeamID"]
+                for player in Players:
+                    playersLoaded += 1
+
+                    if player["Subject"] in stats_data.keys():
+                        if player["Subject"] != req.puuid and player["Subject"] not in partyMembersList:
+                            curr_player_stat = stats_data[player["Subject"]][-1]
+                            i = 1
+                            while curr_player_stat["match_id"] == coregame.match_id and len(stats_data[player["Subject"]]) > i:
+                                i += 1
+                            # if curr_player_stat["match_id"] == coregame.match_id and len(stats_data[player["Subject"]]) > 1:
+                                curr_player_stat = stats_data[player["Subject"]][-i]
+                            if curr_player_stat["match_id"] != coregame.match_id:
+                                # checking for party memebers and self players
+                                times = 0
+                                m_set = ()
+                                for m in stats_data[player["Subject"]]:
+                                    if m["match_id"] != coregame.match_id and m["match_id"] not in m_set:
+                                        times += 1
+                                        m_set += (m["match_id"],)
+                                if player["PlayerIdentity"]["Incognito"] == False:
+                                    already_played_with.append(
+                                        {
+                                            "times": times,
+                                            "name": curr_player_stat["name"],
+                                            "agent": curr_player_stat["agent"],
+                                            "time_diff": time.time() - curr_player_stat["epoch"]
+                                        })
+                                else:
+                                    if player["TeamID"] == allyTeam:
+                                        team_string = "your"
+                                    else:
+                                        team_string = "enemy"
+                                    already_played_with.append(
+                                        {
+                                            "times": times,
+                                            "name": agent_dict[player["CharacterID"].lower()] + " on " + team_string + " team",
+                                            "agent": curr_player_stat["agent"],
+                                            "time_diff": time.time() - curr_player_stat["epoch"]
+                                        })
+
+                    party_icon = ''
+
+                    # set party premade icon
+                    for party in partyOBJ:
+                        if player["Subject"] in partyOBJ[party]:
+                            if party not in partyIcons:
+                                partyIcons.update(
+                                    {party: PARTYICONLIST[partyCount]})
+                                # PARTY_ICON
+                                party_icon = PARTYICONLIST[partyCount]
+                                partyCount += 1
+                            else:
+                                # PARTY_ICON
+                                party_icon = partyIcons[party]
+                    playerRank = rank.get_rank(player["Subject"], seasonID)
+                    if player["Subject"] == req.puuid:
+                        if cfg.get_feature_flag("discord_rpc"):
+                            rpc.set_data({"rank": playerRank["rank"], "rank_name": colors.escape_ansi(
+                                NUMBERTORANKS[playerRank["rank"]]) + " | " + str(playerRank["rr"]) + "rr"})
+
+                    ppstats = pstats.get_stats(player["Subject"])
+                    hs = ppstats["hs"]
+                    kd = ppstats["kd"]
+
+                    player_level = player["PlayerIdentity"].get(
+                        "AccountLevel")
+
+                    if player["PlayerIdentity"]["Incognito"]:
+                        Namecolor = colors.get_color_from_team(player["TeamID"],
+                                                               names[player["Subject"]],
+                                                               player["Subject"], req.puuid, agent=player["CharacterID"], party_members=partyMembersList)
+                    else:
+                        Namecolor = colors.get_color_from_team(player["TeamID"],
+                                                               names[player["Subject"]],
+                                                               player["Subject"], req.puuid, party_members=partyMembersList)
+                    if lastTeam != player["TeamID"]:
+                        if lastTeamBoolean:
+                            table.add_empty_row()
+                    lastTeam = player['TeamID']
+                    lastTeamBoolean = True
+                    if player["PlayerIdentity"]["HideAccountLevel"]:
+                        if player["Subject"] == req.puuid or player["Subject"] in partyMembersList or hide_levels == False:
+                            PLcolor = colors.level_to_color(player_level)
+                        else:
+                            PLcolor = ""
+                    else:
+                        PLcolor = colors.level_to_color(player_level)
+                    # AGENT
+                    agent = colors.get_agent_from_uuid(
+                        player["CharacterID"].lower())
+                    if agent == "" and len(Players) == 1:
+                        isRange = True
+
+                    # NAME
+                    name = Namecolor
+
+                    # VIEWS
+                    # views = get_views(names[player["Subject"]])
+
+                    # skin
+                    skin = loadouts[player["Subject"]]
+
+                    # RANK
+                    rankName = NUMBERTORANKS[playerRank["rank"]]
+
+                    # RANK RATING
+                    rr = playerRank["rr"]
+
+                    # short peak rank string
+                    peakRankAct = f" (e{playerRank['peakrankep']}a{playerRank['peakrankact']})"
+                    if not cfg.get_feature_flag("peak_rank_act"):
+                        peakRankAct = ""
+
+                    # PEAK RANK
+                    peakRank = NUMBERTORANKS[playerRank["peakrank"]
+                                             ] + peakRankAct
+
+                    # LEADERBOARD
+                    leaderboard = playerRank["leaderboard"]
+
+                    hs = colors.get_hs_gradient(hs)
+                    wr = colors.get_wr_gradient(
+                        playerRank["wr"]) + f" ({playerRank['numberofgames']})"
+
+                    if(int(leaderboard) > 0):
+                        is_leaderboard_needed = True
+
+                    # LEVEL
+                    level = PLcolor
+
+                    stats.save_data(
+                        {
+                            player["Subject"]: {
+                                "name": names[player["Subject"]],
+                                "agent": agent_dict[player["CharacterID"].lower()],
+                                "map": map_dict.get(coregame_stats["MapID"].lower()),
+                                "rank": playerRank["rank"],
+                                "rr": rr,
+                                "match_id": coregame.match_id,
+                                "epoch": time.time(),
+                            }
+                        }
+                    )
+                    # bar()
             if game_state == "MENUS":
                 already_played_with = []
                 Players = menu.get_party_members(req.puuid, presence)
@@ -330,11 +533,11 @@ def main(stdscr):
             if kill_threads:
                 break
 
+    loading_status.set_text("Finishing up")
+    loading_ui.draw()
+
     threads.append(threading.Thread(target=update_rpc,
                                     name="update_rpc", args=(), daemon=True))
-
-    threads.append(threading.Thread(
-        target=redraw, name="redraw", args=(), daemon=True))
 
     threads.append(threading.Thread(
         target=game_state_loop, name="game_state_loop", args=(), daemon=True))
@@ -342,7 +545,6 @@ def main(stdscr):
     for thread in threads:
         thread.start()
 
-    loaded = True
     main_ui.activate()
 
 
