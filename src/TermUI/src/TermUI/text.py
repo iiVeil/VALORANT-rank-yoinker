@@ -8,7 +8,7 @@ class Text(Element):
     def __init__(self, content: str, position: Position):
         super().__init__(position)
         self.text = content
-        self.size = Position(len(content), 0)
+        self.size = Position(len(content), 1)
         self.pack = {
             "right": Position(
                 self.size.x+position.x+1, position.y),
