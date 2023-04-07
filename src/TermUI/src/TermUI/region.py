@@ -80,7 +80,7 @@ class Region:
                         iy+self.start.y, self.end.x, BoxCharacters.VERTICAL.value, curses.color_pair(self.color))
 
             # * Create horizontal lines
-            title_offset = 2
+            title_offset = 1
             for ix in range(self.end.x-self.start.x):
                 if 0 < ix < self.end.x:
                     char = BoxCharacters.HORIZONTAL.value

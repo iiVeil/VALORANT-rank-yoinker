@@ -179,7 +179,7 @@ def main(stdscr):
             if game_state == "MENUS":
                 if data['puuid'] in loaded_players:
                     return
-                player_region = Region(data['puuid'], offset, Position(
+                player_region = Region(data['name'], offset, Position(
                     xSpace, content_regions.get("ally_scoreboard").size.y-3))
                 entries = {
                     'name': {
