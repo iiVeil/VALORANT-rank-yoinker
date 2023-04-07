@@ -75,7 +75,6 @@ class UI:
         if region.color == -1:
             region.color = self.default_color
             region.echo_color()
-        self.draw()
 
     def swap(self, new_ui):
         """
@@ -102,12 +101,11 @@ class UI:
 
     def get_clickable(self, position: Position):
         for region in self.regions:
-            if region.inBounds(position):
-                for element in region.elements:
-                    if element.in_bounds(position):
-                        if element.callback is not None:
-                            UI.last_button_clicked = time.time()*1000
-                            element.click()
+            for element in region.elements:
+                if element.in_bounds(position):
+                    if element.callback is not None:
+                        UI.last_button_clicked = time.time()*1000
+                        element.click()
 
     def loop(self):
         """
@@ -133,8 +131,8 @@ class UI:
         ? Description:
         * * Draw the current UI to the terminal
         """
-        if self.active:
-            self.window.refresh()
-            self.window.clear()
-            for region in self.regions:
+        self.window.clear()
+        for region in self.regions:
+            if region.visible:
                 region.draw()
+        self.window.refresh()

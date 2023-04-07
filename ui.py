@@ -1,19 +1,20 @@
 import curses
 import asyncio
-import random
 import time
-import sys
 import os
 import requests
+import math
 import urllib3
 import psutil
 import threading
-from TermUI.button import Button
-from TermUI.ui import UI
-from TermUI.region import Region
-from TermUI.position import Position
-from TermUI.text import Text
-from TermUI.region import BoxCharacters
+import traceback
+from src.TermUI.src.TermUI.button import Button
+from src.TermUI.src.TermUI.ui import UI
+from src.TermUI.src.TermUI.region import Region
+from src.TermUI.src.TermUI.position import Position
+from src.TermUI.src.TermUI.text import Text
+from src.TermUI.src.TermUI.region import BoxCharacters
+from src.TermUI.src.TermUI.button import Button
 from src.constants import *
 from src.requestsV import Requests
 from src.logs import Logging
@@ -26,7 +27,6 @@ from src.presences import Presences
 from src.Loadouts import Loadouts
 from src.websocket import Ws
 
-from TermUI.button import Button
 
 from src.states.menu import Menu
 from src.states.pregame import Pregame
@@ -88,11 +88,11 @@ def main(stdscr):
 
     loading_region.add_element(loading_status)
 
-    loaded = False
-
     loading_ui.draw()
 
     main_ui = UI(stdscr)
+
+    loaded_players = []
 
     tab_region = Region("", Position(0, 0), Position(119, 29))
     tab_region.framed = False
@@ -107,27 +107,177 @@ def main(stdscr):
             tab.color = tab.region.ui.default_color
         button.color = HIGHLIGHTED_TAB
 
-    def scoreboard_tab(button):
+    def ally_tab(button):
         disable_all_tabs()
-        content_regions.get("scoreboard").visible = True
+        content_regions.get("ally_scoreboard").visible = True
+        for region in scoreboard_regions.get("ally"):
+            region.visible = True
+        for region in scoreboard_regions.get("enemy"):
+            region.visible = False
         highlight_button(button)
+        main_ui.draw()
+
+    def enemy_tab(button):
+        disable_all_tabs()
+        content_regions.get("enemy_scoreboard").visible = True
+        for region in scoreboard_regions.get("enemy"):
+            region.visible = True
+        for region in scoreboard_regions.get("ally"):
+            region.visible = False
+        highlight_button(button)
+        main_ui.draw()
 
     def skins_tab(button):
         disable_all_tabs()
         content_regions.get("skins").visible = True
         highlight_button(button)
+        main_ui.draw()
 
     def chat_tab(button):
         disable_all_tabs()
         content_regions.get("chat").visible = True
         highlight_button(button)
+        main_ui.draw()
+
+    scoreboard_regions = dict(ally=list(), enemy=list())
+    content_regions = {
+        "ally_scoreboard": Region(
+            "", Position(0, 2), Position(119, 29)),
+        "enemy_scoreboard": Region(
+            "", Position(0, 2), Position(119, 29)),
+        "skins": Region(
+            "", Position(0, 2), Position(119, 29)),
+        "chat": Region(
+            "", Position(0, 2), Position(119, 29))
+    }
+    offset = content_regions.get("ally_scoreboard").start + Position(1, 3)
+
+    def update_loading_player_count(loaded: list):
+        player_loading_status.set_text(
+            f"Loading players [{loaded[0]}/{loaded[1]}]")
+        player_loading_status.color = WARNING_YELLOW
+        player_loading_status.hidden = False
+        player_loading_status.start = content_regions.get(
+            "ally_scoreboard").sOrigin + Position(1, 0)
+        if loaded[0] > loaded[1]:
+            player_loading_status.hidden = True
+        main_ui.draw()
+
+    def even_centered(xPos: int):
+        if xPos % 2 == 0:
+            return xPos + 1
+        return xPos
+
+    def draw_player(data: dict, loaded: list):
+        nonlocal offset
+        xSpace = math.ceil(
+            (content_regions.get("ally_scoreboard").size.x-2)/5)
+
+        update_loading_player_count(loaded)
+        # ally screen
+        if loaded[0] <= 5:
+            if game_state == "MENUS":
+                if data['puuid'] in loaded_players:
+                    return
+                player_region = Region(data['puuid'], offset, Position(
+                    xSpace, content_regions.get("ally_scoreboard").size.y-3))
+                entries = {
+                    'name': {
+                        'text': data['name'].split("#")[0],
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(data['name'].split("#")[0])/2)-1,
+                            2
+                        ),
+                        'color': 0
+                    },
+                    'rank': {
+                        'text': f"{data['rankName'][0]} {data['rr']}rr",
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(f"{data['rankName'][0]} {data['rr']}rr")/2)-1,
+                            5
+                        ),
+                        'color': data['rankName'][1]
+                    },
+                    'peak': {
+                        'text': f"\u0394 {data['peak'][0][0]}{data['peak'][1]}",
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(f"\u0394 {data['peak'][0][0]}{data['peak'][1]}")/2)-1,
+                            6
+                        ),
+                        'color': data['peak'][0][1]
+                    },
+                    'hs': {
+                        'text': f"HS: {data['hs'][0]}%",
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(f"HS: {data['hs'][0]}%")/2)-1,
+                            8
+                        ),
+                        'color': data['hs'][1]
+                    },
+                    'wr': {
+                        'text': f"WR: {data['wr'][0][0]}%{data['wr'][1]}",
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(f"WR: {data['wr'][0][0]}%{data['wr'][1]}")/2)-1,
+                            9
+                        ),
+                        'color': data['wr'][0][1]
+                    },
+                    'kd': {
+                        'text': f"KD: {data['kd'][0]}",
+                        'position': Position(
+                            player_region.size.half().x -
+                            math.floor(
+                                len(f"KD: {data['kd'][0]}")/2)-1,
+                            10
+                        ),
+                        'color': data['kd'][1]
+                    }
+                }
+                for item in entries:
+                    print(item)
+                    item = entries[item]
+                    element = Text(
+                        item['text'], item['position'])
+                    if item['color'] > 0:
+                        element.color = item['color']
+
+                    player_region.add_element(element)
+                print(player_region.elements)
+
+                main_ui.add_region(player_region)
+                scoreboard_regions.get("ally").append(player_region)
+                offset += Position(xSpace, 0)
+
+                if loaded[0] == 5:
+                    offset = content_regions.get(
+                        "enemy_scoreboard").start + Position(1, 3)
+
+        if loaded[0] > 5:
+            ...
+        main_ui.draw()
 
     tab_offset = Position(-1, -1)
     pretabs = {
-        "Scoreboard": scoreboard_tab,
+        "Allies": ally_tab,
+        "Enemies": enemy_tab,
         "Skins": skins_tab,
         "Chat": chat_tab
     }
+
+    player_loading_status = Text('', Position(0, 0))
+    player_loading_status.hidden = True
+
+    tab_region.add_element(player_loading_status)
 
     loading_status.set_text("Creating UI...")
     loading_ui.draw()
@@ -135,28 +285,18 @@ def main(stdscr):
     tabs = []
     for name in pretabs:
         created = Button(name, tab_offset, pretabs[name])
-        created.rounded = True
         tabs.append(created)
         tab_region.add_element(created)
         tab_offset += Position(created.size.x + 1, 0)
 
     tabs[0].color = HIGHLIGHTED_TAB
 
-    content_regions = {
-        "scoreboard": Region(
-            "", Position(0, 2), Position(119, 29)),
-        "skins": Region(
-            "", Position(0, 2), Position(119, 29)),
-        "chat": Region(
-            "", Position(0, 2), Position(119, 29))
-    }
-
     for region in content_regions:
         main_ui.add_region(content_regions.get(region))
 
     disable_all_tabs()
 
-    content_regions['scoreboard'].visible = True
+    content_regions['ally_scoreboard'].visible = True
 
     # content_regions.get("scoreboard").add_element(
     #    Text("Scoreboard", Position(0, 0)))
@@ -175,7 +315,8 @@ def main(stdscr):
         curses.curs_set(0)
         curses.mousemask(1)
 
-    waiting_thread = threading.Thread(target=redraw_load, args=(), daemon=True)
+    waiting_thread = threading.Thread(
+        target=redraw_load, args=(), daemon=True)
 
     waiting_thread.start()
 
@@ -215,7 +356,7 @@ def main(stdscr):
     gameContent = content.get_content()
     seasonID = content.get_latest_season_id(gameContent)
     lastGameState = ""
-
+    presence = None
     waiting = False
 
     # print(color("\nVisit https://vry.netlify.app/matchLoadouts to view full player inventories\n", fore=(255, 253, 205)))
@@ -246,14 +387,14 @@ def main(stdscr):
 
     def update_rpc():
         nonlocal game_state
-        again = True
+
         while True:
             try:
                 rpc_status.set_text("● RPC Running")
                 rpc_status.color = SUCCESS_GREEN
                 rpc_status.start = Position(content_regions.get(
-                    "scoreboard").size.x-2-len(rpc_status.text), 3)
-                main_ui.draw()
+                    "ally_scoreboard").size.x-2-len(rpc_status.text), 3)
+                rpc_status.draw()
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 game_state = loop.run_until_complete(
@@ -262,16 +403,18 @@ def main(stdscr):
                 loop.close()
                 if kill_threads:
                     break
-            except Exception:
+            except Exception as e:
+                main_ui.deactivate()
+                print(e)
                 rpc_status.color = INACTIVE_RED
                 rpc_status.set_text("● RPC Lost")
-                main_ui.draw()
-                again = True
-                continue
 
     def game_state_loop():
+        nonlocal presence
         nonlocal rpc
+        nonlocal loaded_players
         nonlocal game_state
+        nonlocal rpc_status
         try:
             log(f"getting new {game_state} scoreboard")
             lastGameState = game_state
@@ -463,6 +606,18 @@ def main(stdscr):
                         # LEVEL
                         level = PLcolor
 
+                        players[player["Subject"]]["name"] = name
+                        players[player["Subject"]]["agent"] = agent
+                        players[player["Subject"]]["rankName"] = rankName
+                        players[player["Subject"]]["rr"] = rr
+                        players[player["Subject"]]["peak"] = peakRank
+                        players[player["Subject"]]["hs"] = hs
+                        players[player["Subject"]]["kd"] = kd
+                        players[player["Subject"]]["level"] = [
+                            player_level, PLcolor]
+                        players[player["Subject"]]["wr"] = wr
+                        players[player["Subject"]]["leaderboard"] = leaderboard
+
                         stats.save_data(
                             {
                                 player["Subject"]: {
@@ -486,7 +641,10 @@ def main(stdscr):
                         "AccountLevel"), reverse=True)
                     seen = []
                     for player in Players:
-
+                        if player['Subject'] in loaded_players:
+                            continue
+                        update_loading_player_count(
+                            [playersLoaded, len(Players)])
                         if player not in seen:
                             playersLoaded += 1
                             party_icon = PARTYICONLIST[0]
@@ -498,7 +656,7 @@ def main(stdscr):
                                         {"rank": playerRank["rank"], "rank_name": NUMBERTORANKS[playerRank["rank"]][0] + " | " + str(playerRank["rr"]) + "rr"})
                         ppstats = pstats.get_stats(player["Subject"])
                         hs = ppstats["hs"]
-                        kd = ppstats["kd"]
+                        kd = colors.get_kd_gradient(ppstats["kd"])
 
                         player_level = player["PlayerIdentity"].get(
                             "AccountLevel")
@@ -522,15 +680,15 @@ def main(stdscr):
                             peakRankAct = ""
 
                         # PEAK RANK
-                        peakRank = NUMBERTORANKS[playerRank["peakrank"]
-                                                 ] + peakRankAct
+                        peakRank = [NUMBERTORANKS[playerRank["peakrank"]
+                                                  ], peakRankAct]
 
                         # LEADERBOARD
                         leaderboard = playerRank["leaderboard"]
 
                         hs = colors.get_hs_gradient(hs)
-                        wr = colors.get_wr_gradient(
-                            playerRank["wr"]) + f" ({playerRank['numberofgames']})"
+                        wr = [colors.get_wr_gradient(
+                            playerRank["wr"]), f" ({playerRank['numberofgames']})"]
 
                         if(int(leaderboard) > 0):
                             is_leaderboard_needed = True
@@ -538,12 +696,18 @@ def main(stdscr):
                         # LEVEL
                         level = PLcolor
 
+                        draw_player(dict(puuid=player['Subject'], name=name, agent=agent, rankName=rankName, rr=rr, peak=peakRank,
+                                         hs=hs, kd=kd, wr=wr, leaderboard=leaderboard, level=[player_level, PLcolor]), [playersLoaded, len(Players)])
+
+                        loaded_players.append(player['Subject'])
+
                         seen.append(player["Subject"])
                 time.sleep(1)
                 if kill_threads:
                     break
-        except Exception:
-            ...
+        except Exception as e:
+            main_ui.deactivate()
+            traceback.print_exc()
 
     loading_status.set_text("Finishing up")
     loading_ui.draw()

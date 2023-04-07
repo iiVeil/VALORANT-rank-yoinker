@@ -79,11 +79,23 @@ class Colors:
             return [number, 89]
         elif 5 < number <= 10:
             return [number, 173]
-        elif 10 < number <= 15:
+        elif 10 < number <= 20:
             return [number, 149]
-        elif 15 < number <= 29:
+        elif 20 < number <= 29:
             return [number, 77]
         elif 29 < number:
+            return [number, 227]
+
+    def get_kd_gradient(self, number):
+        if 0 < number <= .7:
+            return [number, 89]
+        elif .7 < number <= 1:
+            return [number, 173]
+        elif 1 < number <= 1.2:
+            return [number, 149]
+        elif 1.2 < number <= 1.5:
+            return [number, 77]
+        elif 1.5 < number:
             return [number, 227]
 
     def get_wr_gradient(self, number):
