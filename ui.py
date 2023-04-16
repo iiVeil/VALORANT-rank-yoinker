@@ -606,18 +606,6 @@ def main(stdscr):
                         # LEVEL
                         level = PLcolor
 
-                        players[player["Subject"]]["name"] = name
-                        players[player["Subject"]]["agent"] = agent
-                        players[player["Subject"]]["rankName"] = rankName
-                        players[player["Subject"]]["rr"] = rr
-                        players[player["Subject"]]["peak"] = peakRank
-                        players[player["Subject"]]["hs"] = hs
-                        players[player["Subject"]]["kd"] = kd
-                        players[player["Subject"]]["level"] = [
-                            player_level, PLcolor]
-                        players[player["Subject"]]["wr"] = wr
-                        players[player["Subject"]]["leaderboard"] = leaderboard
-
                         stats.save_data(
                             {
                                 player["Subject"]: {

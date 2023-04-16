@@ -84,10 +84,10 @@ class Colors:
         elif 20 < number <= 29:
             return [number, 77]
         elif 29 < number:
-            return [number, 227]
+            return [f"✦ {number}", 221]
 
     def get_kd_gradient(self, number):
-        if 0 < number <= .7:
+        if 0 <= number <= .7:
             return [number, 89]
         elif .7 < number <= 1:
             return [number, 173]
@@ -96,7 +96,7 @@ class Colors:
         elif 1.2 < number <= 1.5:
             return [number, 77]
         elif 1.5 < number:
-            return [number, 227]
+            return [f"✦ {number}", 221]
 
     def get_wr_gradient(self, number):
         try:
@@ -113,7 +113,7 @@ class Colors:
         elif 40 < number <= 60:
             return [number, 77]
         elif 60 < number:
-            return [number, 227]
+            return [f"✦ {number}", 221]
 
     def escape_ansi(self, line):
         ansi_escape = re.compile(r'(?:\x1B[@-_]|[\x80-\x9F])[0-?]*[ -/]*[@-~]')
