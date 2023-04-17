@@ -87,6 +87,8 @@ class Colors:
             return [f"✦ {number}", 221]
 
     def get_kd_gradient(self, number):
+        if number == "N/a":
+            return ["N/A", 238]
         if 0 <= number <= .7:
             return [number, 89]
         elif .7 < number <= 1:
@@ -99,11 +101,8 @@ class Colors:
             return [f"✦ {number}", 221]
 
     def get_wr_gradient(self, number):
-        try:
-            number = int(number)
-        except ValueError:
+        if number == "N/a":
             return ["N/A", 238]
-
         if 0 < number <= 15:
             return [number, 89]
         elif 15 < number <= 25:

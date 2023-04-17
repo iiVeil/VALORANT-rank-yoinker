@@ -102,6 +102,14 @@ def main(stdscr):
         for region in content_regions:
             content_regions[region].visible = False
 
+    def ally_view(action: bool):
+        for region in scoreboard_regions.get("ally"):
+            region.visible = action
+
+    def enemy_view(action: bool):
+        for region in scoreboard_regions.get("enemy"):
+            region.visible = action
+
     def highlight_button(button):
         for tab in tabs:
             tab.color = tab.region.ui.default_color
@@ -109,32 +117,32 @@ def main(stdscr):
 
     def ally_tab(button):
         disable_all_tabs()
+        ally_view(True)
+        enemy_view(False)
         content_regions.get("ally_scoreboard").visible = True
-        for region in scoreboard_regions.get("ally"):
-            region.visible = True
-        for region in scoreboard_regions.get("enemy"):
-            region.visible = False
         highlight_button(button)
         main_ui.draw()
 
     def enemy_tab(button):
         disable_all_tabs()
+        ally_view(False)
+        enemy_view(True)
         content_regions.get("enemy_scoreboard").visible = True
-        for region in scoreboard_regions.get("enemy"):
-            region.visible = True
-        for region in scoreboard_regions.get("ally"):
-            region.visible = False
         highlight_button(button)
         main_ui.draw()
 
     def skins_tab(button):
         disable_all_tabs()
+        ally_view(False)
+        enemy_view(False)
         content_regions.get("skins").visible = True
         highlight_button(button)
         main_ui.draw()
 
     def chat_tab(button):
         disable_all_tabs()
+        ally_view(False)
+        enemy_view(False)
         content_regions.get("chat").visible = True
         highlight_button(button)
         main_ui.draw()
@@ -170,100 +178,145 @@ def main(stdscr):
 
     def draw_player(data: dict, loaded: list):
         nonlocal offset
-        xSpace = math.ceil(
+        xSpace = math.floor(
             (content_regions.get("ally_scoreboard").size.x-2)/5)
 
         update_loading_player_count(loaded)
         # ally screen
-        if loaded[0] <= 5:
-            if game_state == "MENUS":
-                if data['puuid'] in loaded_players:
-                    return
-                player_region = Region(data['name'], offset, Position(
-                    xSpace, content_regions.get("ally_scoreboard").size.y-3))
-                entries = {
-                    'name': {
-                        'text': data['name'].split("#")[0],
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(data['name'].split("#")[0])/2)-1,
-                            2
-                        ),
-                        'color': 0
-                    },
-                    'rank': {
-                        'text': f"{data['rankName'][0]} {data['rr']}rr",
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(f"{data['rankName'][0]} {data['rr']}rr")/2)-1,
-                            5
-                        ),
-                        'color': data['rankName'][1]
-                    },
-                    'peak': {
-                        'text': f"\u0394 {data['peak'][0][0]}{data['peak'][1]}",
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(f"\u0394 {data['peak'][0][0]}{data['peak'][1]}")/2)-1,
-                            6
-                        ),
-                        'color': data['peak'][0][1]
-                    },
-                    'hs': {
-                        'text': f"HS: {data['hs'][0]}%",
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(f"HS: {data['hs'][0]}%")/2)-1,
-                            8
-                        ),
-                        'color': data['hs'][1]
-                    },
-                    'wr': {
-                        'text': f"WR: {data['wr'][0][0]}%{data['wr'][1]}",
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(f"WR: {data['wr'][0][0]}%{data['wr'][1]}")/2)-1,
-                            9
-                        ),
-                        'color': data['wr'][0][1]
-                    },
-                    'kd': {
-                        'text': f"KD: {data['kd'][0]}",
-                        'position': Position(
-                            player_region.size.half().x -
-                            math.floor(
-                                len(f"KD: {data['kd'][0]}")/2)-1,
-                            10
-                        ),
-                        'color': data['kd'][1]
-                    }
+        if game_state == "MENUS" or game_state == "INGAME":
+            if data['puuid'] in loaded_players:
+                return
+            player_region = Region('', offset, Position(
+                xSpace, content_regions.get("ally_scoreboard").size.y-3))
+            entries = {
+                'agent': {
+                    'text': data['agent'][0],
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(data['agent'][0])/2)-1,
+                        1
+                    ),
+                    'color': data['agent'][1]
+                },
+                'name': {
+                    'text': data['name'].split("#")[0],
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(data['name'].split("#")[0])/2)-1,
+                        2
+                    ),
+                    'color': 0
+                },
+                'tag': {
+                    'text': f'#{data["name"].split("#")[1]}',
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            (len(data['name'].split("#")[1])+1)/2)-1,
+                        3
+                    ),
+                    'color': 239
+                },
+                'rank': {
+                    'text': f"{data['rankName'][0]} {data['rr']}rr",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"{data['rankName'][0]} {data['rr']}rr")/2)-1,
+                        5
+                    ),
+                    'color': data['rankName'][1]
+                },
+                'peak': {
+                    'text': f"\u0394 {data['peak'][0][0]}{data['peak'][1]}",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"\u0394 {data['peak'][0][0]}{data['peak'][1]}")/2)-1,
+                        6
+                    ),
+                    'color': data['peak'][0][1]
+                },
+                'hs': {
+                    'text': f"HS: {data['hs'][0]}%",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"HS: {data['hs'][0]}%")/2)-1,
+                        8
+                    ),
+                    'color': data['hs'][1]
+                },
+                'wr': {
+                    'text': f"WR: {data['wr'][0][0]}%{data['wr'][1]}",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"WR: {data['wr'][0][0]}%{data['wr'][1]}")/2)-1,
+                        9
+                    ),
+                    'color': data['wr'][0][1]
+                },
+                'kd': {
+                    'text': f"KD: {data['kd'][0]}",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"KD: {data['kd'][0]}")/2)-1,
+                        10
+                    ),
+                    'color': data['kd'][1]
+                },
+                'vandal': {
+                    'text': f"{data['vandal'][0]}",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"{data['vandal'][0]}")/2)-1,
+                        12
+                    ),
+                    'color': data['vandal'][1]
+                },
+                'phantom': {
+                    'text': f"{data['phantom'][0]}",
+                    'position': Position(
+                        player_region.size.half().x -
+                        math.floor(
+                            len(f"{data['phantom'][0]}")/2)-1,
+                        13
+                    ),
+                    'color': data['phantom'][1]
                 }
-                for item in entries:
-                    print(item)
-                    item = entries[item]
-                    element = Text(
-                        item['text'], item['position'])
-                    if item['color'] > 0:
-                        element.color = item['color']
+            }
+            for item in entries:
+                item = entries[item]
+                element = Text(
+                    item['text'], item['position'])
+                if item['color'] > 0:
+                    element.color = item['color']
 
-                    player_region.add_element(element)
-                print(player_region.elements)
+                player_region.add_element(element)
 
-                main_ui.add_region(player_region)
-                scoreboard_regions.get("ally").append(player_region)
-                offset += Position(xSpace, 0)
+            main_ui.add_region(player_region)
+            place_at = scoreboard_regions.get("ally")
+            if loaded[0]-1 > 5:
+                place_at = scoreboard_regions.get("enemy")
+            place_at.append(player_region)
+            offset += Position(xSpace, 0)
 
-                if loaded[0] == 5:
-                    offset = content_regions.get(
-                        "enemy_scoreboard").start + Position(1, 3)
+            if loaded[0]-1 == 5:
+                offset = content_regions.get(
+                    "enemy_scoreboard").start + Position(1, 3)
 
-        if loaded[0] > 5:
-            ...
+        main_ui.draw()
+
+    def clear_scoreboard_regions():
+        nonlocal scoreboard_regions
+        content_regions.get("ally_scoreboard").elements = []
+        content_regions.get("enemy_scoreboard").elements = []
+        scoreboard_regions = dict(ally=list(), enemy=list())
         main_ui.draw()
 
     tab_offset = Position(-1, -1)
@@ -414,6 +467,7 @@ def main(stdscr):
         nonlocal rpc
         nonlocal loaded_players
         nonlocal game_state
+        nonlocal scoreboard_regions
         nonlocal rpc_status
         try:
             log(f"getting new {game_state} scoreboard")
@@ -427,6 +481,9 @@ def main(stdscr):
             is_leaderboard_needed = False
             while True:
                 if game_state == "INGAME":
+                    if lastGameState != game_state:
+                        clear_scoreboard_regions()
+                        loaded_players = []
                     coregame_stats = coregame.get_coregame_stats()
                     if coregame_stats == None:
                         continue
@@ -455,6 +512,7 @@ def main(stdscr):
                     names = namesClass.get_names_from_puuids(Players)
                     loadouts = loadoutsClass.get_match_loadouts(coregame.get_coregame_match_id(
                     ), Players, cfg.weapon, valoApiSkins, names, state="game")
+                    log(str(loadouts))
                     # with alive_bar(total=len(Players), title='Fetching Players', bar='classic2') as bar:
                     isRange = False
                     playersLoaded = 1
@@ -533,12 +591,12 @@ def main(stdscr):
                         playerRank = rank.get_rank(player["Subject"], seasonID)
                         if player["Subject"] == req.puuid:
                             if cfg.get_feature_flag("discord_rpc"):
-                                rpc.set_data({"rank": playerRank["rank"], "rank_name": colors.escape_ansi(
-                                    NUMBERTORANKS[playerRank["rank"]]) + " | " + str(playerRank["rr"]) + "rr"})
+                                rpc.set_data(
+                                    {"rank": playerRank["rank"], "rank_name": NUMBERTORANKS[playerRank["rank"]][0] + " | " + str(playerRank["rr"]) + "rr"})
 
                         ppstats = pstats.get_stats(player["Subject"])
                         hs = ppstats["hs"]
-                        kd = ppstats["kd"]
+                        kd = colors.get_kd_gradient(ppstats["kd"])
 
                         player_level = player["PlayerIdentity"].get(
                             "AccountLevel")
@@ -570,13 +628,18 @@ def main(stdscr):
                             isRange = True
 
                         # NAME
-                        name = Namecolor
+                        name = agent_dict[player["CharacterID"].lower(
+                        )] if player["PlayerIdentity"]["Incognito"] else names[player["Subject"]]
 
                         # VIEWS
                         # views = get_views(names[player["Subject"]])
 
                         # skin
-                        skin = loadouts[player["Subject"]]
+                        vandal = loadouts.get(player["Subject"]).get(
+                            '9c82e19d-4575-0200-1a81-3eacf00cf872')
+
+                        phantom = loadouts.get(player["Subject"]).get(
+                            'ee8e8d15-496b-07ac-e5f6-8fae5d4c7b1a')
 
                         # RANK
                         rankName = NUMBERTORANKS[playerRank["rank"]]
@@ -590,21 +653,26 @@ def main(stdscr):
                             peakRankAct = ""
 
                         # PEAK RANK
-                        peakRank = NUMBERTORANKS[playerRank["peakrank"]
-                                                 ] + peakRankAct
+                        peakRank = [NUMBERTORANKS[playerRank["peakrank"]
+                                                  ], peakRankAct]
 
                         # LEADERBOARD
                         leaderboard = playerRank["leaderboard"]
 
                         hs = colors.get_hs_gradient(hs)
-                        wr = colors.get_wr_gradient(
-                            playerRank["wr"]) + f" ({playerRank['numberofgames']})"
+                        wr = [colors.get_wr_gradient(
+                            playerRank["wr"]), f" ({playerRank['numberofgames']})"]
 
                         if(int(leaderboard) > 0):
                             is_leaderboard_needed = True
 
                         # LEVEL
                         level = PLcolor
+
+                        draw_player(dict(puuid=player['Subject'], name=name, agent=agent, rankName=rankName, rr=rr, peak=peakRank, vandal=vandal, phantom=phantom,
+                                         hs=hs, kd=kd, wr=wr, leaderboard=leaderboard, level=[player_level, PLcolor]), [playersLoaded, len(Players)])
+
+                        loaded_players.append(player['Subject'])
 
                         stats.save_data(
                             {
@@ -621,6 +689,9 @@ def main(stdscr):
                         )
                         # bar()
                 if game_state == "MENUS":
+                    if lastGameState != game_state:
+                        clear_scoreboard_regions()
+                        loaded_players = []
                     already_played_with = []
                     Players = menu.get_party_members(req.puuid, presence)
                     names = namesClass.get_names_from_puuids(Players)
